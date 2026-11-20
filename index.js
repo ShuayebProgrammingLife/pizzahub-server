@@ -6,6 +6,7 @@ import morgan from "morgan";
 import { getDb } from "./config/db.js";
 
 import meRoutes from "./routes/me.routes.js";
+import itemRoutes from "./routes/items.routes.js";
 
 const app = express();
 
@@ -17,6 +18,8 @@ app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 
 app.use(express.json());
 app.use(morgan("dev"));
+
+app.use("/api/items", itemRoutes);
 
 app.get("/", (req, res) => {
   res.json({ ok: true, message: "PizzaHub API is running" });
