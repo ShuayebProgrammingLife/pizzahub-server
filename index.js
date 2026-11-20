@@ -26,7 +26,12 @@ app.get("/api/health", async (req, res) => {
     await db.command({ ping: 1 });
     res.json({ status: "OK", db: "connected" });
   } catch (err) {
-    res.status(500).json({ status: "error", message: "Database connection failed" });
+    console.error("DB ERROR:", err.message);
+    res.status(500).json({
+      status: "error",
+      message: "Database connection failed",
+      ...(process.env.NODE_ENV !== "production" && { detail: err.message }),
+    });
   }
 });
 
