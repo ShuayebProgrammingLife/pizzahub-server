@@ -5,6 +5,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { getDb } from "./config/db.js";
 
+import meRoutes from "./routes/me.routes.js";
+
 const app = express();
 
 app.use(helmet());
@@ -34,6 +36,8 @@ app.get("/api/health", async (req, res) => {
     });
   }
 });
+
+app.use("/api", meRoutes);
 
 // 404 handler
 app.use((req, res) => {
