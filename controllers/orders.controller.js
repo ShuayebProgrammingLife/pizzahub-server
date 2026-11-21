@@ -86,3 +86,89 @@ export async function createOrder(req, res, next) {
     next(err);
   }
 }
+
+const STATUSES = ["pending", "accepted", "rejected", "cancelled"];
+
+// GET /api/orders/vendor?status=pending (only this vendor's orders)
+export async function vendorOrders(req, res, next) {
+  try {
+    const db = await getDb();
+    const match = { vendorId: new ObjectId(req.user.id) };
+    if (typeof req.query.status === "string" && STATUSES.includes(req.query.status)) {
+      match.status = req.query.status;
+    }
+
+    const orders = await db
+      .collection("orders")
+      .aggregate([
+        { $match: match },
+        { $sort: { createdAt: -1 } },
+        { $limit: 200 },
+        { $lookup: { from: "menuItems", localField: "itemId", foreignField: "_id", as: "item" } },
+        { $unwind: { path: "$item", preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: "users", localField: "customerId", foreignField: "_id", as: "customer" } },
+        { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            status: 1,
+            deliveryDate: 1,
+            deliveryAddress: 1,
+            message: 1,
+            createdAt: 1,
+            priceAtOrder: 1,
+            customer: { name: "$customer.name", email: "$customer.email", image: "$customer.image" },
+            item: {
+              _id: "$item._id",
+              itemName: "$item.itemName",
+              image: { $arrayElemAt: ["$item.images", 0] },
+              price: "$item.price",
+            },
+          },
+        },
+      ])
+      .toArray();
+
+    res.json({ orders });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/orders/:id/status  { status: "accepted" | "rejected" }
+export async function updateOrderStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!OID.test(id)) return res.status(400).json({ message: "Invalid order id" });
+
+    const newStatus = req.body?.status;
+    if (!["accepted", "rejected"].includes(newStatus)) {
+      return res.status(400).json({ message: "Status must be accepted or rejected" });
+    }
+
+    const db = await getDb();
+    const orders = db.collection("orders");
+    const order = await orders.findOne({ _id: new ObjectId(id) });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // ownership: vendors can only touch their own orders
+    if (order.vendorId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You can only manage your own orders" });
+    }
+    if (order.status !== "pending") {
+      return res.status(409).json({ message: "Only pending orders can be accepted or rejected" });
+    }
+
+    // the status filter makes this atomic: a second click can never change it again
+    const result = await orders.updateOne(
+      { _id: order._id, vendorId: order.vendorId, status: "pending" },
+      { $set: { status: newStatus, respondedAt: new Date(), updatedAt: new Date() } }
+    );
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({ message: "This order was already updated" });
+    }
+
+    res.json({ message: `Order ${newStatus}`, status: newStatus });
+  } catch (err) {
+    next(err);
+  }
+}
