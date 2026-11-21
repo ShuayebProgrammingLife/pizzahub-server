@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "../config/db.js";
 import { getStripe } from "../utils/stripe.js";
 import { isPremium } from "../utils/plan.js";
+import { onCheckoutCompleted } from "./webhook.controller.js";
 
 const PLAN_NAME = "PizzaHub Premium";
 const PLAN_AMOUNT_CENTS = 3900; // $39/month, used only when STRIPE_PRICE_ID is not set
@@ -93,6 +94,21 @@ export async function paymentStatus(req, res, next) {
       .collection("transactions")
       .findOne({ stripeSessionId: sid, vendorId: new ObjectId(req.user.id) }); // own payments only
     if (!tx) return res.status(404).json({ message: "Payment not found" });
+
+    // If still pending (e.g. in local development before webhook arrives or network delay),
+    // verify securely with Stripe server-side using the secret key
+    if (tx.status === "pending") {
+      try {
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.retrieve(sid);
+        if (session && session.payment_status === "paid") {
+          await onCheckoutCompleted(session, db);
+          tx.status = "paid";
+        }
+      } catch (err) {
+        console.error("Direct session verification check error:", err?.message);
+      }
+    }
 
     res.json({ status: tx.status, plan: tx.plan, amount: tx.amount, currency: tx.currency });
   } catch (err) {

@@ -11,7 +11,7 @@ const periodEnd = (sub) => {
 };
 const idOf = (v) => (typeof v === "string" ? v : v?.id ?? null);
 
-async function onCheckoutCompleted(session, db) {
+export async function onCheckoutCompleted(session, db) {
   if (session.mode !== "subscription" || session.payment_status !== "paid") return;
 
   const vendorId = session.client_reference_id;
