@@ -142,6 +142,17 @@ export async function deleteItem(req, res, next) {
   try {
     const item = await getOwned(req, res);
     if (!item) return;
+
+    const db = await getDb();
+    const active = await db
+      .collection("orders")
+      .countDocuments({ itemId: item._id, status: { $in: ["pending", "accepted"] } });
+    if (active > 0) {
+      return res.status(409).json({
+        message: "This item has active orders. Handle them first, or mark the item unavailable instead.",
+      });
+    }
+
     const col = await getCol();
     await col.deleteOne({ _id: item._id });
     res.json({ message: "Item deleted" });
