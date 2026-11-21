@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 import { requireRole } from "../middleware/requireRole.js";
+
+import { browseItems, featuredItems, itemsMeta, getItem } from "../controllers/publicItems.controller.js";
+
 import {
   createItem,
   myItems,
@@ -20,6 +23,8 @@ router.get("/meta", itemsMeta);
 
 // Vendor only ("/mine" must stay above "/:id" routes)
 router.get("/mine", ...vendorOnly, myItems);
+router.get("/:id", getItem);
+
 router.post("/", ...vendorOnly, createItem);
 router.patch("/:id", ...vendorOnly, updateItem);
 router.patch("/:id/availability", ...vendorOnly, setAvailability);

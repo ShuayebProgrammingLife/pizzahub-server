@@ -1,6 +1,8 @@
 import { getDb } from "../config/db.js";
 import { CATEGORIES } from "../utils/constants.js";
 
+import { ObjectId } from "mongodb";
+
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const SORTS = {
@@ -169,6 +171,45 @@ export async function itemsMeta(req, res, next) {
       })),
       locations: [...seen.values()].sort((a, b) => a.localeCompare(b)),
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/items/:id (only approved, available items from unblocked vendors)
+export async function getItem(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!/^[a-f\d]{24}$/i.test(id)) return res.status(400).json({ message: "Invalid item id" });
+
+    const db = await getDb();
+    const [item] = await db
+      .collection("menuItems")
+      .aggregate([
+        ...visibleStages({ _id: new ObjectId(id) }),
+        { $addFields: { vendorIsPremium: PREMIUM_EXPR } },
+        {
+          $project: {
+            itemName: 1,
+            category: 1,
+            description: 1,
+            price: 1,
+            location: 1,
+            images: 1,
+            createdAt: 1,
+            vendor: {
+              id: "$vendor._id",
+              name: { $ifNull: ["$vendor.businessName", "$vendor.name"] },
+              image: "$vendor.image",
+              isPremium: "$vendorIsPremium",
+            },
+          },
+        },
+      ])
+      .toArray();
+
+    if (!item) return res.status(404).json({ message: "This item is not available" });
+    res.json({ item });
   } catch (err) {
     next(err);
   }
