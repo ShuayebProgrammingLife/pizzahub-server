@@ -26,8 +26,13 @@ export async function createCheckoutSession(req, res, next) {
       .collection("users")
       .findOne({ _id: vendorId }, { projection: { stripeCustomerId: 1 } });
 
-    const lineItem = process.env.STRIPE_PRICE_ID
-      ? { price: process.env.STRIPE_PRICE_ID, quantity: 1 }
+    const validPriceId =
+      typeof process.env.STRIPE_PRICE_ID === "string" &&
+      process.env.STRIPE_PRICE_ID.trim().startsWith("price_") &&
+      !process.env.STRIPE_PRICE_ID.includes("...");
+
+    const lineItem = validPriceId
+      ? { price: process.env.STRIPE_PRICE_ID.trim(), quantity: 1 }
       : {
         price_data: {
           currency: "usd",
