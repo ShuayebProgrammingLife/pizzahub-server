@@ -11,7 +11,6 @@ import {
   setAvailability,
   deleteItem,
 } from "../controllers/items.controller.js";
-import { browseItems, featuredItems, itemsMeta } from "../controllers/publicItems.controller.js";
 
 const router = Router();
 const vendorOnly = [verifyJWT, requireRole("vendor")];
