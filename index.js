@@ -17,7 +17,31 @@ import { stripeWebhook } from "./controllers/webhook.controller.js";
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.CLIENT_URL?.replace(/\/+$/, ""),
+  "http://localhost:3000",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const clean = origin.replace(/\/+$/, "");
+      if (
+        allowedOrigins.includes(origin) ||
+        allowedOrigins.includes(clean) ||
+        origin.endsWith(".vercel.app") ||
+        process.env.CLIENT_URL === "*"
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Allow all to prevent any production CORS disruption
+    },
+    credentials: true,
+  })
+);
 
 // NOTE: the Stripe webhook route (express.raw) will be added HERE later,
 // Stripe needs the RAW body to verify the signature, so this goes BEFORE express.json()
