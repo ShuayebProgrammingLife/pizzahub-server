@@ -10,7 +10,7 @@ export async function vendorOverview(req, res, next) {
     const items = db.collection("menuItems");
     const orders = db.collection("orders");
 
-    const [totalItems, activeItems, pendingItems, pendingOrders, acceptedOrders, revenue] =
+    const [totalItems, activeItems, pendingItems, pendingOrders, acceptedOrders, revenue, account] =
       await Promise.all([
         items.countDocuments({ vendorId }),
         items.countDocuments({
@@ -27,6 +27,9 @@ export async function vendorOverview(req, res, next) {
             { $group: { _id: null, total: { $sum: "$priceAtOrder" } } },
           ])
           .toArray(),
+        db
+          .collection("users")
+          .findOne({ _id: vendorId }, { projection: { subscriptionCancelAtPeriodEnd: 1, stripeCustomerId: 1 } }),
       ]);
 
     const premium = isPremium(req.user);
@@ -39,6 +42,8 @@ export async function vendorOverview(req, res, next) {
       acceptedRevenue: revenue[0]?.total ?? 0,
       plan: premium ? "premium" : "free",
       planExpiresAt: premium ? req.user.subscriptionExpiresAt : null,
+      cancelAtPeriodEnd: premium && !!account?.subscriptionCancelAtPeriodEnd,
+      canManageBilling: !!account?.stripeCustomerId,
       limit: premium ? null : FREE_ACTIVE_LIMIT, // null = unlimited
     });
   } catch (err) {

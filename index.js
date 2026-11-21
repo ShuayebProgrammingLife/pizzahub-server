@@ -11,6 +11,8 @@ import orderRoutes from "./routes/orders.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
+import paymentRoutes from "./routes/payments.routes.js";
+import { stripeWebhook } from "./controllers/webhook.controller.js";
 
 const app = express();
 
@@ -18,6 +20,9 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 
 // NOTE: the Stripe webhook route (express.raw) will be added HERE later,
+// Stripe needs the RAW body to verify the signature, so this goes BEFORE express.json()
+app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhook);
+
 // BEFORE express.json(), so the signature check works.
 
 app.use(express.json());
@@ -28,6 +33,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/admin", adminRoutes);
 
+app.use("/api/payments", paymentRoutes);
 
 app.get("/", (req, res) => {
   res.json({ ok: true, message: "PizzaHub API is running" });
