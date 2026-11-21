@@ -9,6 +9,7 @@ import meRoutes from "./routes/me.routes.js";
 import itemRoutes from "./routes/items.routes.js";
 import orderRoutes from "./routes/orders.routes.js";
 import vendorRoutes from "./routes/vendor.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 
 const app = express();
@@ -25,6 +26,8 @@ app.use(morgan("dev"));
 app.use("/api/items", itemRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/vendor", vendorRoutes);
+app.use("/api/admin", adminRoutes);
+
 
 app.get("/", (req, res) => {
   res.json({ ok: true, message: "PizzaHub API is running" });
