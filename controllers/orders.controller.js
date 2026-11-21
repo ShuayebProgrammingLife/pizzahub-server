@@ -172,3 +172,116 @@ export async function updateOrderStatus(req, res, next) {
     next(err);
   }
 }
+
+// GET /api/orders/mine?status=pending&limit=4 (only this customer's orders)
+export async function customerOrders(req, res, next) {
+  try {
+    const db = await getDb();
+    const match = { customerId: new ObjectId(req.user.id) };
+    if (typeof req.query.status === "string" && STATUSES.includes(req.query.status)) {
+      match.status = req.query.status;
+    }
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 200));
+
+    const orders = await db
+      .collection("orders")
+      .aggregate([
+        { $match: match },
+        { $sort: { createdAt: -1 } },
+        { $limit: limit },
+        { $lookup: { from: "menuItems", localField: "itemId", foreignField: "_id", as: "item" } },
+        { $unwind: { path: "$item", preserveNullAndEmptyArrays: true } },
+        { $lookup: { from: "users", localField: "vendorId", foreignField: "_id", as: "vendor" } },
+        { $unwind: { path: "$vendor", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            status: 1,
+            deliveryDate: 1,
+            deliveryAddress: 1,
+            message: 1,
+            createdAt: 1,
+            respondedAt: 1,
+            cancelledAt: 1,
+            priceAtOrder: 1,
+            item: {
+              _id: "$item._id",
+              itemName: "$item.itemName",
+              image: { $arrayElemAt: ["$item.images", 0] },
+              location: "$item.location",
+            },
+            // vendor name and photo only, never their email
+            vendor: {
+              name: { $ifNull: ["$vendor.businessName", "$vendor.name"] },
+              image: "$vendor.image",
+            },
+          },
+        },
+      ])
+      .toArray();
+
+    res.json({ orders });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/orders/mine/summary
+export async function customerSummary(req, res, next) {
+  try {
+    const db = await getDb();
+    const rows = await db
+      .collection("orders")
+      .aggregate([
+        { $match: { customerId: new ObjectId(req.user.id) } },
+        { $group: { _id: "$status", n: { $sum: 1 } } },
+      ])
+      .toArray();
+
+    const by = Object.fromEntries(rows.map((r) => [r._id, r.n]));
+    const summary = {
+      pending: by.pending ?? 0,
+      accepted: by.accepted ?? 0,
+      rejected: by.rejected ?? 0,
+      cancelled: by.cancelled ?? 0,
+    };
+    res.json({ total: Object.values(summary).reduce((a, b) => a + b, 0), ...summary });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/orders/:id/cancel
+export async function cancelOrder(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!OID.test(id)) return res.status(400).json({ message: "Invalid order id" });
+
+    const db = await getDb();
+    const orders = db.collection("orders");
+    const order = await orders.findOne({ _id: new ObjectId(id) });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // ownership: customers can only cancel their own orders
+    if (order.customerId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You can only cancel your own orders" });
+    }
+    if (order.status !== "pending") {
+      return res
+        .status(409)
+        .json({ message: `This order is already ${order.status} and cannot be cancelled` });
+    }
+
+    // the status filter makes this atomic: if the vendor responds first, this changes nothing
+    const result = await orders.updateOne(
+      { _id: order._id, customerId: order.customerId, status: "pending" },
+      { $set: { status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() } }
+    );
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({ message: "This order was just updated and can no longer be cancelled" });
+    }
+
+    res.json({ message: "Order cancelled", status: "cancelled" });
+  } catch (err) {
+    next(err);
+  }
+}
