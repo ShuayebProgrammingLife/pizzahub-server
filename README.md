@@ -6,7 +6,7 @@ The backend server for **PizzaHub** is built with **Node.js**, **Express.js**, *
 
 ## Live Links & Repositories
 
-* **Live Server API**: `https://pizzahub-server.onrender.com` *(Replace with your live deployment URL)*
+* **Live Server API**: `https://pizzahub-server-n1u2.onrender.com`
 * **Client GitHub Repository**: `https://github.com/ShuayebProgrammingLife/pizzahub-client`
 * **Server GitHub Repository**: `https://github.com/ShuayebProgrammingLife/PizzaHub-Pizza-Ordering-Delivery-Platform`
 
@@ -163,7 +163,7 @@ Handled via `middleware/verifyJWT.js` and `middleware/requireRole.js`:
 ## Testing Instructions & Credentials
 
 * **Admin Email**: `admin@pizzahub.com`
-* **Admin Password**: `Admin1234!`
+* **Admin Password**: `Admin1234`
 * **Stripe Test Card**: `4242 4242 4242 4242` (Expiry: Any future date, CVC: `123`, ZIP: `10001`)
 * **Stripe Webhook CLI (Local Testing)**:
   ```bash
