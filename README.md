@@ -91,7 +91,7 @@ The database relies on four primary business collections within MongoDB:
 Create a `.env` file in the `pizzahub-server` directory:
 
 ```env
-PORT=5000
+PORT=3002
 CLIENT_URL=http://localhost:3000
 AUTH_URL=http://localhost:3000
 
